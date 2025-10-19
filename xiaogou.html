@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>小勾的炫酷随机抽签工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Arial', sans-serif; }
+        body { 
+            min-height: 100vh; 
+            background: #0f172a; 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 2rem; 
+            overflow: hidden; 
+        }
+        #particle-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        .container { 
+            position: relative; 
+            z-index: 1; 
+            text-align: center; 
+            max-width: 800px; 
+            width: 100%; 
+            background: rgba(30, 41, 59, 0.8); 
+            padding: 2.5rem; 
+            border-radius: 16px; 
+            backdrop-filter: blur(8px); 
+            box-shadow: 0 0 30px rgba(74, 222, 128, 0.2); 
+        }
+        h1 { 
+            font-size: 2.2rem; 
+            margin-bottom: 1.5rem; 
+            background: linear-gradient(90deg, #4ade80, #60a5fa); 
+            -webkit-background-clip: text; 
+            background-clip: text; 
+            color: transparent; 
+        }
+        textarea { 
+            width: 100%; 
+            height: 160px; 
+            padding: 1rem; 
+            margin: 1rem 0; 
+            border: 2px solid #334155; 
+            border-radius: 10px; 
+            background: rgba(15, 23, 42, 0.6); 
+            color: white; 
+            font-size: 1rem; 
+            resize: none; 
+            transition: border 0.3s; 
+        }
+        textarea:focus { outline: none; border-color: #4ade80; }
+        .setting { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 1rem; 
+            margin: 1.5rem 0; 
+        }
+        .setting p { font-size: 1.1rem; }
+        input { 
+            width: 100px; 
+            padding: 0.8rem; 
+            border: 2px solid #334155; 
+            border-radius: 10px; 
+            background: rgba(15, 23, 42, 0.6); 
+            color: white; 
+            font-size: 1rem; 
+            text-align: center; 
+            transition: border 0.3s; 
+        }
+        input:focus { outline: none; border-color: #4ade80; }
+        .btn-group { 
+            display: flex; 
+            gap: 1.2rem; 
+            justify-content: center; 
+            margin: 1.5rem 0 2rem; 
+        }
+        button { 
+            padding: 1rem 2.5rem; 
+            border: none; 
+            border-radius: 10px; 
+            font-size: 1.1rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.3s; 
+        }
+        #drawBtn { 
+            background: linear-gradient(90deg, #4ade80, #22c55e); 
+            color: #0f172a; 
+        }
+        #drawBtn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(74, 222, 128, 0.5); }
+        #clearBtn { 
+            background: transparent; 
+            border: 2px solid #94a3b8; 
+            color: #94a3b8; 
+        }
+        #clearBtn:hover { 
+            border-color: #f87171; 
+            color: #f87171; 
+            box-shadow: 0 0 20px rgba(248, 113, 113, 0.3); 
+        }
+        /* 滚动抽奖容器 */
+        #draw-container { 
+            height: 120px; 
+            margin: 1rem 0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden; 
+            border-radius: 12px; 
+            background: rgba(15, 23, 42, 0.8); 
+            border: 2px solid #334155; 
+        }
+        #rolling-names { 
+            font-size: 2.5rem; 
+            font-weight: bold; 
+            text-align: center; 
+            height: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: transform 0.08s linear; /* 滚动动画速度 */
+        }
+        /* 抽中结果样式 */
+        #result { margin-top: 2rem; }
+        #result p { font-size: 1.2rem; margin-bottom: 1rem; }
+        .winner { 
+            display: inline-block; 
+            padding: 1rem 2rem; 
+            margin: 0.8rem; 
+            background: linear-gradient(90deg, #60a5fa, #3b82f6); 
+            color: white; 
+            border-radius: 12px; 
+            font-size: 1.3rem; 
+            font-weight: bold; 
+            opacity: 0; 
+            transform: scale(0.5); 
+        }
+        /* 炸开动画 */
+        @keyframes pop {
+            0% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 30px rgba(96, 165, 250, 0.8); }
+            100% { opacity: 1; transform: scale(1); box-shadow: 0 0 20px rgba(96, 165, 250, 0.5); }
+        }
+        .winner.pop { animation: pop 0.8s ease-out forwards; }
+        /* 粒子样式 */
+        .particle { 
+            position: absolute; 
+            border-radius: 50%; 
+            background: rgba(74, 222, 128, 0.7); 
+            opacity: 0; 
+            animation: float 6s infinite ease-in-out; 
+        }
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0.7; }
+            50% { transform: translateY(-50px) rotate(180deg); opacity: 0.3; }
+            100% { transform: translateY(0) rotate(360deg); opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 粒子背景 -->
+    <div id="particle-bg"></div>
+    
+    <div class="container">
+        <h1>炫酷随机抽签工具</h1>
+        <p>请在下方输入人名，每行1个</p>
+        
+        <textarea id="nameList" placeholder="例如：
+张三
+李四
+王五
+赵六
+孙七
+周八"></textarea>
+        
+        <div class="setting">
+            <p>请输入抽取数量：</p>
+            <input type="number" id="drawCount" min="1" value="1">
+        </div>
+        
+        <div class="btn-group">
+            <button id="drawBtn" onclick="startDraw()">开始抽签</button>
+            <button id="clearBtn" onclick="clearAll()">清空所有</button>
+        </div>
+        
+        <!-- 滚动抽奖区域 -->
+        <div id="draw-container">
+            <div id="rolling-names">点击开始抽签</div>
+        </div>
+        
+        <!-- 结果显示区域 -->
+        <div id="result">
+            <p>抽签结果将显示在这里...</p>
+        </div>
+    </div>
+
+    <script>
+        // 1. 粒子背景生成
+        function createParticles() {
+            const bg = document.getElementById('particle-bg');
+            const particleCount = 80; // 粒子数量
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // 随机粒子大小、位置、动画延迟
+                const size = Math.random() * 8 + 2;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 10;
+                const duration = Math.random() * 10 + 5;
+                
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.left = `${left}%`;
+                particle.style.top = `${top}%`;
+                particle.style.animationDelay = `${delay}s`;
+                particle.style.animationDuration = `${duration}s`;
+                
+                bg.appendChild(particle);
+            }
+        }
+        // 页面加载时生成粒子
+        window.onload = createParticles;
+
+        // 2. 抽签核心逻辑
+        let isDrawing = false; // 是否正在抽签
+        let rollInterval; // 滚动定时器
+        let rollSpeed = 80; // 初始滚动速度（毫秒）
+        let slowDownStep = 5; // 减速步长
+        let currentSpeed; // 当前滚动速度
+
+        function startDraw() {
+            // 禁止重复抽签
+            if (isDrawing) return;
+            
+            const nameText = document.getElementById('nameList').value.trim();
+            const drawCount = parseInt(document.getElementById('drawCount').value);
+            const rollingBox = document.getElementById('rolling-names');
+            const resultBox = document.getElementById('result');
+            
+            // 输入验证
+            if (!nameText) { alert('请先输入人名！'); return; }
+            const nameList = nameText.split('\n').filter(name => name.trim() !== '');
+            if (drawCount > nameList.length) { 
+                alert(`抽取数量不能超过人名总数（共${nameList.length}人）！`); 
+                return; 
+            }
+            
+            // 重置状态
+            isDrawing = true;
+            resultBox.innerHTML = '<p>抽签中...</p>';
+            document.getElementById('drawBtn').disabled = true;
+            currentSpeed = rollSpeed;
+            
+            // 3. 名字滚动动画（模拟老虎机）
+            let rollIndex = 0;
+            rollInterval = setInterval(() => {
+                rollIndex = (rollIndex + 1) % nameList.length;
+                rollingBox.textContent = nameList[rollIndex];
+                // 随机颜色（增强视觉效果）
+                const colors = ['#4ade80', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c'];
+                rollingBox.style.color = colors[Math.floor(Math.random() * colors.length)];
+            }, currentSpeed);
+
+            // 4. 控制滚动时长与减速（1.5秒后开始减速，3秒后停止）
+            setTimeout(() => {
+                // 开始减速
+                const slowDownInterval = setInterval(() => {
+                    currentSpeed += slowDownStep;
+                    clearInterval(rollInterval);
+                    rollInterval = setInterval(() => {
+                        rollIndex = (rollIndex + 1) % nameList.length;
+                        rollingBox.textContent = nameList[rollIndex];
+                        const colors = ['#4ade80', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c'];
+                        rollingBox.style.color = colors[Math.floor(Math.random() * colors.length)];
+                    }, currentSpeed);
+                }, 150);
+
+                // 停止滚动并显示结果
+                setTimeout(() => {
+                    clearInterval(rollInterval);
+                    clearInterval(slowDownInterval);
+                    isDrawing = false;
+                    document.getElementById('drawBtn').disabled = false;
+                    
+                    // 随机抽取不重复的名字
+                    const shuffled = [...nameList].sort(() => 0.5 - Math.random());
+                    const winners = shuffled.slice(0, drawCount);
+                    
+                    // 显示结果（带炸开动画）
+                    resultBox.innerHTML = '<p>恭喜以下中奖者！</p>';
+                    winners.forEach((winner, index) => {
+                        const winnerElement = document.createElement('div');
+                        winnerElement.className = 'winner';
+                        winnerElement.textContent = winner;
+                        resultBox.appendChild(winnerElement);
+                        // 依次触发动画（错开时间更炫酷）
+                        setTimeout(() => {
+                            winnerElement.classList.add('pop');
+                        }, index * 300);
+                    });
+                }, 1500); // 减速1.5秒后停止
+            }, 1500); // 先快速滚动1.5秒
+        }
+
+        // 5. 清空所有内容
+        function clearAll() {
+            document.getElementById('nameList').value = '';
+            document.getElementById('drawCount').value = 1;
+            document.getElementById('rolling-names').textContent = '点击开始抽签';
+            document.getElementById('rolling-names').style.color = '';
+            document.getElementById('result').innerHTML = '<p>抽签结果将显示在这里...</p>';
+            // 停止可能的滚动
+            if (rollInterval) clearInterval(rollInterval);
+            isDrawing = false;
+            document.getElementById('drawBtn').disabled = false;
+        }
+    </script>
+</body>
+</html>
